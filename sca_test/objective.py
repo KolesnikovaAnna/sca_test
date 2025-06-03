@@ -61,6 +61,8 @@ def create_objective(
         print("[INFO] Model compiled.")
 
         print("[INFO] Starting training...")
+        x_val, y_val = val_generator[0]
+        print(f"[DEBUG] val_generator[0] shapes: {x_val.shape}, {y_val.shape}")
         model.fit(
             train_generator,
             validation_data=val_generator,
