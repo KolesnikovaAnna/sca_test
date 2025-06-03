@@ -57,7 +57,7 @@ def create_objective(
             train_generator,
             validation_data=val_generator,
             epochs=epochs,
-            verbose=0,
+            verbose=1,
         )
 
         val_loss, val_acc = model.evaluate(val_generator, verbose=0)
