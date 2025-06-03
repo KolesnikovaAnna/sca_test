@@ -86,25 +86,3 @@ def run_sca(
     print(f"🔧 Лучшие параметры: {callback.best_params}")
 
     return model, callback.best_params, callback.best_acc
-
-
-def run_sca(data_path, model_fn, augmentations_list=None, n_trials=20, batch_size=8, epochs=5, img_size=(224, 224)):
-    datagen_val = ImageDataGenerator(rescale=1. / 255)
-    val_generator = datagen_val.flow_from_directory(
-        directory=os.path.join(data_path, 'train/val'),
-        target_size=img_size,
-        batch_size=batch_size,
-        class_mode='categorical'
-    )
-    class_indices = val_generator.class_indices
-
-    print("🔍 Starting Smart Composite Augmentation...")
-    start = time.time()
-    study = optuna.create_study(direction="maximize")
-    study.optimize(objective, n_trials=n_trials)
-    duration = timedelta(seconds=int(time.time() - start))
-
-    print("\n✅ Optimization finished.")
-    print("Best trial:")
-    print(study.best_trial)
-    print(f"⏱️ Total optimization time: {duration}")
