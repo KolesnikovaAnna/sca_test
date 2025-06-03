@@ -30,6 +30,7 @@ class CustomDataGenerator(Sequence):
         np.random.shuffle(self.indexes)
 
     def __getitem__(self, idx):
+        print(f"[INFO] Генерируем батч: {idx}")
         batch_paths = [self.image_paths[i] for i in self.indexes[idx * self.batch_size:(idx + 1) * self.batch_size]]
         batch_labels = [self.labels[i] for i in self.indexes[idx * self.batch_size:(idx + 1) * self.batch_size]]
 
