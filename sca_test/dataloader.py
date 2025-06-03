@@ -30,7 +30,6 @@ class CustomDataGenerator(Sequence):
         np.random.shuffle(self.indexes)
 
     def __getitem__(self, idx):
-        print(f"[INFO] Генерируем батч: {idx}")
         batch_paths = [self.image_paths[i] for i in self.indexes[idx * self.batch_size:(idx + 1) * self.batch_size]]
         batch_labels = [self.labels[i] for i in self.indexes[idx * self.batch_size:(idx + 1) * self.batch_size]]
 
@@ -51,5 +50,6 @@ class CustomDataGenerator(Sequence):
 
         images = np.stack(images)
         labels = tf.keras.utils.to_categorical(batch_labels[:len(images)], num_classes=len(self.class_indices))
-
+        
+        print(f"[BATCH SHAPE] Images: {images.shape}, Labels: {labels.shape}")
         return images, labels
