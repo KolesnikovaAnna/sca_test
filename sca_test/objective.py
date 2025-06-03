@@ -65,7 +65,7 @@ def create_objective(
         print(f"[DEBUG] val_generator[0] shapes: {x_val.shape}, {y_val.shape}")
         model.fit(
             train_generator,
-            validation_data=val_generator,
+            #validation_data=val_generator,
             epochs=epochs,
             verbose=1,
         )
