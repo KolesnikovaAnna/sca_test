@@ -16,6 +16,7 @@ def create_objective(
     val_generator
 ):
     def objective(trial):
+        print("\n[START] Trial", trial.number)
         transforms = []
 
         if use_random_brightness_contrast:
@@ -42,6 +43,8 @@ def create_objective(
         transforms.append(A.Resize(224, 224))
         augmentations = A.Compose(transforms)
 
+        print("[INFO] Creating train generator...")
+
         train_generator = CustomDataGenerator(
             directory=f"{dataset_path}/{train_dir}",
             batch_size=batch_size,
@@ -49,16 +52,22 @@ def create_objective(
             class_indices=class_indices
         )
 
+        print("[INFO] Train generator created.")
+        
+        print("[INFO] Compiling model...")
         model.compile(optimizer='adam',
                       loss='categorical_crossentropy',
                       metrics=['accuracy'])
+        print("[INFO] Model compiled.")
 
+        print("[INFO] Starting training...")
         model.fit(
             train_generator,
             validation_data=val_generator,
             epochs=epochs,
             verbose=1,
         )
+        print("[INFO] Training complete.")
 
         val_loss, val_acc = model.evaluate(val_generator, verbose=0)
         return val_acc
