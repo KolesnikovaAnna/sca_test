@@ -35,6 +35,7 @@ def run_sca(
         class_mode='categorical'
     )
     class_indices = val_generator.class_indices
+    print("\ndatagen_val finished")
 
     if model is None:
         base_model = MobileNetV2(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
@@ -47,6 +48,8 @@ def run_sca(
         predictions = Dense(len(class_indices), activation='softmax')(x)
 
         model = Model(inputs=base_model.input, outputs=predictions)
+
+    print("\nmodel finished")
 
     objective = create_objective(
         dataset_path=dataset_path,
@@ -61,6 +64,7 @@ def run_sca(
         model=model,
         val_generator=val_generator
     )
+    print("\nobjective finished")
 
     class TrialCallback:
         def __init__(self):
