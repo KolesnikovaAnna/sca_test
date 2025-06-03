@@ -51,5 +51,4 @@ class CustomDataGenerator(Sequence):
         images = np.stack(images)
         labels = tf.keras.utils.to_categorical(batch_labels[:len(images)], num_classes=len(self.class_indices))
         
-        print(f"[BATCH SHAPE] Images: {images.shape}, Labels: {labels.shape}")
         return images, labels
