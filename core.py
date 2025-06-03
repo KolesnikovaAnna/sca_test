@@ -3,16 +3,90 @@ import time
 from datetime import timedelta
 
 import optuna
-import albumentations as A
-import cv2
-import numpy as np
 import tensorflow as tf
+from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras.layers import Dense, Dropout, GlobalAveragePooling2D
 from tensorflow.keras.models import Model
-from tensorflow.keras.layers import GlobalAveragePooling2D, Dense, Dropout
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
-from .dataloader import CustomDataGenerator
+from sca_test.dataloader import CustomDataGenerator
+from sca_test.objective import create_objective
+
+IMG_SIZE = (224, 224)
+
+def run_sca(
+    model=None,
+    dataset_path='',
+    n_trials=20,
+    batch_size=8,
+    epochs=5,
+    use_random_brightness_contrast=False,
+    use_hue_saturation_value=False,
+    use_rotate=False,
+    val_dir='train/val',
+    train_dir='train/train'
+):
+    datagen_val = ImageDataGenerator(rescale=1./255)
+    val_generator = datagen_val.flow_from_directory(
+        directory=os.path.join(dataset_path, val_dir),
+        target_size=IMG_SIZE,
+        batch_size=batch_size,
+        class_mode='categorical'
+    )
+    class_indices = val_generator.class_indices
+
+    if model is None:
+        base_model = MobileNetV2(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
+        base_model.trainable = False
+
+        x = base_model.output
+        x = GlobalAveragePooling2D()(x)
+        x = Dense(512, activation='relu')(x)
+        x = Dropout(0.5)(x)
+        predictions = Dense(len(class_indices), activation='softmax')(x)
+
+        model = Model(inputs=base_model.input, outputs=predictions)
+
+    objective = create_objective(
+        dataset_path=dataset_path,
+        train_dir=train_dir,
+        val_dir=val_dir,
+        batch_size=batch_size,
+        epochs=epochs,
+        class_indices=class_indices,
+        use_random_brightness_contrast=use_random_brightness_contrast,
+        use_hue_saturation_value=use_hue_saturation_value,
+        use_rotate=use_rotate,
+        model=model,
+        val_generator=val_generator
+    )
+
+    class TrialCallback:
+        def __init__(self):
+            self.best_acc = 0.0
+            self.best_params = {}
+
+        def __call__(self, study, trial):
+            if trial.value > self.best_acc:
+                self.best_acc = trial.value
+                self.best_params = trial.params.copy()
+
+    callback = TrialCallback()
+
+    print("🔍 Запуск оптимизации...")
+    start_time = time.time()
+
+    study = optuna.create_study(direction="maximize")
+    study.optimize(objective, n_trials=n_trials, callbacks=[callback])
+
+    duration = timedelta(seconds=int(time.time() - start_time))
+    print(f"\n✅ Оптимизация завершена за {duration}")
+    print(f"🎯 Лучшая точность: {callback.best_acc:.4f}")
+    print(f"🔧 Лучшие параметры: {callback.best_params}")
+
+    return model, callback.best_params, callback.best_acc
+
 
 def run_sca(data_path, model_fn, augmentations_list=None, n_trials=20, batch_size=8, epochs=5, img_size=(224, 224)):
     datagen_val = ImageDataGenerator(rescale=1. / 255)
@@ -23,57 +97,6 @@ def run_sca(data_path, model_fn, augmentations_list=None, n_trials=20, batch_siz
         class_mode='categorical'
     )
     class_indices = val_generator.class_indices
-
-    def objective(trial):
-        brightness = trial.suggest_float("brightness_limit", 0.0, 0.5)
-        contrast = trial.suggest_float("contrast_limit", 0.0, 0.5)
-        rotate = trial.suggest_int("rotate_limit", 0, 45)
-        hue = trial.suggest_int("hue_shift_limit", 0, 30)
-        sat = trial.suggest_int("sat_shift_limit", 0, 50)
-        val_shift = trial.suggest_int("val_shift_limit", 0, 50)
-
-        if augmentations_list is None:
-            augmentations = A.Compose([
-                A.RandomBrightnessContrast(brightness_limit=brightness, contrast_limit=contrast, p=0.5),
-                A.Rotate(limit=rotate, border_mode=cv2.BORDER_REFLECT_101, p=0.5),
-                A.HueSaturationValue(hue_shift_limit=hue, sat_shift_limit=sat, val_shift_limit=val_shift, p=0.5),
-                A.Resize(*img_size)
-            ])
-        else:
-            augmentations = A.Compose([
-                aug(p=0.5) for aug in augmentations_list
-            ] + [A.Resize(*img_size)])
-
-        train_generator = CustomDataGenerator(
-            directory=os.path.join(data_path, 'train/train'),
-            batch_size=batch_size,
-            augmentations=augmentations,
-            class_indices=class_indices,
-            img_size=img_size
-        )
-
-        base_model = model_fn()
-        base_model.trainable = False
-
-        x = base_model.output
-        x = GlobalAveragePooling2D()(x)
-        x = Dense(512, activation='relu')(x)
-        x = Dropout(0.5)(x)
-        output = Dense(len(class_indices), activation='softmax')(x)
-        model = Model(inputs=base_model.input, outputs=output)
-
-        model.compile(optimizer=tf.keras.optimizers.Adam(1e-4),
-                      loss='categorical_crossentropy',
-                      metrics=['accuracy'])
-
-        model.fit(train_generator,
-                  validation_data=val_generator,
-                  epochs=epochs,
-                  verbose=0,
-                  callbacks=[EarlyStopping(monitor="val_loss", patience=2, restore_best_weights=True)])
-
-        _, val_acc = model.evaluate(val_generator, verbose=0)
-        return val_acc
 
     print("🔍 Starting Smart Composite Augmentation...")
     start = time.time()
